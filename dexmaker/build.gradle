@@ -1,15 +1,4 @@
-buildscript {
-    repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-    }
-    dependencies {
-        classpath "net.ltgt.gradle:gradle-errorprone-plugin:0.0.13"
-    }
-}
-
-apply plugin: "net.ltgt.errorprone"
+import org.gradle.internal.os.OperatingSystem
 apply plugin: 'java'
 
 description = "A utility for doing compile or runtime code generation targeting Android's Dalvik VM"
@@ -21,10 +10,26 @@ repositories {
     jcenter()
 }
 
-tasks.withType(JavaCompile) {
-    options.compilerArgs += ["-Xep:StringSplitter:OFF"]
-}
-
 dependencies {
     compileOnly project(':dalvikdx')
+}
+
+task dexInJar(type: Jar) {
+    dependsOn jar
+    doFirst {
+        exec {
+            workingDir jar.destinationDir
+            if (OperatingSystem.current().isWindows())
+                executable "dx.bat"
+            else
+                executable "dx"
+            args "--dex", "--output", "classes.dex", "${jar.archiveName}"
+        }
+    }
+    from "${jar.destinationDir}/classes.dex"
+    destinationDir jar.destinationDir
+    baseName "eddexmaker"
+    onlyIf {
+        !jar.state.upToDate || !file(archiveName).exists()
+    }
 }
